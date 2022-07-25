@@ -1,11 +1,15 @@
-import mahotas
 import numpy as np
 import logging
 import waterz
-from scipy.ndimage.morphology import distance_transform_edt
-from scipy.ndimage.filters import gaussian_filter, maximum_filter
+from scipy.ndimage import label, \
+        maximum_filter, \
+		gaussian_filter, \
+        measurements, \
+        distance_transform_edt
+from skimage.segmentation import watershed
 
 logger = logging.getLogger(__name__)
+
 
 def watershed(lsds, sigma, return_seeds=False, return_distances=False):
     '''Extract initial fragments from local shape descriptors ``lsds`` using a
@@ -48,13 +52,19 @@ def watershed_from_affinities(
             seeds = np.zeros(mean_affs.shape, dtype=np.uint64)
 
         id_offset = 0
+
         for z in range(depth):
 
             boundary_mask = mean_affs[z]>0.5*max_affinity_value
             boundary_distances = distance_transform_edt(boundary_mask)
 
+            if labels_mask is not None:
+
+                boundary_mask *= labels_mask.astype(bool)
+
             ret = watershed_from_boundary_distance(
                 boundary_distances,
+                boundary_mask,
                 return_seeds=return_seeds,
                 id_offset=id_offset,
                 min_seed_distance=min_seed_distance)
@@ -76,33 +86,37 @@ def watershed_from_affinities(
 
         ret = watershed_from_boundary_distance(
             boundary_distances,
-            return_seeds,
+            boundary_mask,
+            return_seeds=return_seeds,
             min_seed_distance=min_seed_distance)
 
         fragments = ret[0]
 
     return ret
 
+
 def watershed_from_boundary_distance(
         boundary_distances,
+        boundary_mask,
         return_seeds=False,
         id_offset=0,
         min_seed_distance=10):
 
     max_filtered = maximum_filter(boundary_distances, min_seed_distance)
     maxima = max_filtered==boundary_distances
-    seeds, n = mahotas.label(maxima)
+    seeds, n = label(maxima)
 
-    logger.debug("Found %d fragments", n)
+    print(f"Found {n} fragments")
 
     if n == 0:
         return np.zeros(boundary_distances.shape, dtype=np.uint64), id_offset
 
     seeds[seeds!=0] += id_offset
 
-    fragments = mahotas.cwatershed(
+    fragments = watershed(
         boundary_distances.max() - boundary_distances,
-        seeds)
+        seeds,
+        mask=boundary_mask)
 
     ret = (fragments.astype(np.uint64), n + id_offset)
     if return_seeds:

@@ -371,7 +371,7 @@ class LsdAgglomeration(object):
         # since voxels outside of the nodes do not contribute, either
         change_roi = change_roi.intersect(roi_u.union(roi_v))
 
-        if change_roi.empty():
+        if change_roi.empty:
             self.__log_warning(
                 "change ROI between %s and %s is empty: u=%s, v=%s, "
                 "u_grown=%s, v_grown=%s",
@@ -386,7 +386,7 @@ class LsdAgglomeration(object):
 
         # finally, ensure that we deliver multiples of the downsampling factor
         # used by the lsd_extractor
-        dims = change_roi.dims()
+        dims = change_roi.dims
         change_roi = change_roi.snap_to_grid((self.lsd_extractor.downsample,)*dims)
         context_roi = context_roi.snap_to_grid((self.lsd_extractor.downsample,)*dims)
 
@@ -398,7 +398,7 @@ class LsdAgglomeration(object):
         shape = tuple(s.stop - s.start for s in slices)
 
         roi = gp.Roi(offset, shape)
-        roi = roi.snap_to_grid((self.lsd_extractor.downsample,)*roi.dims())
+        roi = roi.snap_to_grid((self.lsd_extractor.downsample,)*roi.dims)
 
         return roi
 
