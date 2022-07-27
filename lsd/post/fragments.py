@@ -2,7 +2,7 @@ import numpy as np
 import logging
 import waterz
 from scipy.ndimage import label, \
-        maximum_filter,
+        maximum_filter, \
         distance_transform_edt
 from skimage.segmentation import watershed
 from skimage.filters import sobel, threshold_otsu
