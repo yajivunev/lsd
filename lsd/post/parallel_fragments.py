@@ -147,6 +147,155 @@ def block_done(block, rag_provider):
     return rag_provider.num_nodes(block.write_roi) > 0
 
 def watershed_in_block(
+        ds_in,
+        block,
+        context,
+        rag_provider,
+        fragments_out,
+        num_voxels_in_block,
+        mask=None,
+        fragments_in_xy=False,
+        epsilon_agglomerate=0.0,
+        filter_fragments=0.0,
+        min_seed_distance=10,
+        replace_sections=None):
+    '''
+    Args:
+        filter_fragments (float):
+            Filter fragments that have an average affinity lower than this
+            value.
+        min_seed_distance (int):
+            Controls distance between seeds in the initial watershed. Reducing
+            this value improves downsampled segmentation.
+    '''
+
+    total_roi = ds_in.roi
+
+    name = ds_in.data.name[-4:] # "lsds" or "affs"
+
+    logger.debug(f"reading {name} from %s", block.read_roi)
+
+    ds_in = ds_in.intersect(block.read_roi)
+    ds_in.materialize()
+
+    if ds_in.dtype == np.uint8:
+        logger.info("Assuming affinities/lsds are in [0,255]")
+        max_affinity_value = 255.0
+        ds_in.data = ds_in.data.astype(np.float32)
+    else:
+        max_affinity_value = 1.0
+
+    if mask is not None:
+
+        logger.debug("reading mask from %s", block.read_roi)
+        mask_data = get_mask_data_in_roi(mask, ds_in.roi, ds_in.voxel_size)
+        logger.debug(f"masking {name}")
+        ds_in.data *= mask_data
+    
+    # extract fragments
+    if name == 'affs':
+
+        fragments_data, _ = watershed_from_affinities(
+                ds_in.data,
+                max_affinity_value,
+                fragments_in_xy=fragments_in_xy,
+                min_seed_distance=min_seed_distance)
+
+    elif name == 'lsds':
+
+        fragments_data, _ = watershed_from_lsds(ds_in.data)
+
+    else: raise AssertionError("can only make fragments from lsds or affs")
+
+    if mask is not None:
+        fragments_data *= mask_data.astype(np.uint64)
+
+    if filter_fragments > 0 and name == "affs":
+
+        if fragments_in_xy:
+            average_affs = np.mean(ds_in.data[0:2]/max_affinity_value, axis=0)
+        else:
+            average_affs = np.mean(ds_in.data/max_affinity_value, axis=0)
+
+        filtered_fragments = []
+
+        fragment_ids = np.unique(fragments_data)
+
+        for fragment, mean in zip(
+                fragment_ids,
+                measurements.mean(
+                    average_affs,
+                    fragments_data,
+                    fragment_ids)):
+            if mean < filter_fragments:
+                filtered_fragments.append(fragment)
+
+        filtered_fragments = np.array(
+            filtered_fragments,
+            dtype=fragments_data.dtype)
+        replace = np.zeros_like(filtered_fragments)
+        replace_values(fragments_data, filtered_fragments, replace, inplace=True)
+
+    if epsilon_agglomerate > 0 and name=="affs":
+
+        logger.info(
+            "Performing initial fragment agglomeration until %f",
+            epsilon_agglomerate)
+
+        generator = waterz.agglomerate(
+                affs=ds_in.data/max_affinity_value,
+                thresholds=[epsilon_agglomerate],
+                fragments=fragments_data,
+                scoring_function='OneMinus<HistogramQuantileAffinity<RegionGraphType, 25, ScoreValue, 256, false>>',
+                discretize_queue=256,
+                return_merge_history=False,
+                return_region_graph=False)
+        fragments_data[:] = next(generator)
+
+        # cleanup generator
+        for _ in generator:
+            pass
+
+    if replace_sections:
+
+        logger.info("Replacing sections...")
+
+        block_begin = block.write_roi.get_begin()
+        shape = block.write_roi.get_shape()
+
+        z_context = context[0]/ds_in.voxel_size[0]
+        logger.info("Z context: %i",z_context)
+
+        mapping = {}
+
+        voxel_offset = block_begin[0]/ds_in.voxel_size[0]
+
+        for i,j in zip(
+                range(fragments_data.shape[0]),
+                range(shape[0])):
+            mapping[i] = i
+            mapping[j] = int(voxel_offset + i) \
+                    if block_begin[0] == total_roi.get_begin()[0] \
+                    else int(voxel_offset + (i - z_context))
+
+        logging.info('Mapping: %s', mapping)
+
+        replace = [k for k,v in mapping.items() if v in replace_sections]
+
+        for r in replace:
+            logger.info("Replacing mapped section %i with zero", r)
+            fragments_data[r] = 0
+
+    #todo add key value replacement option
+
+    fragments = daisy.Array(fragments_data, ds_in.roi, ds_in.voxel_size)
+
+    # crop fragments to write_roi
+    fragments = fragments[block.write_roi]
+    fragments.materialize()
+
+
+def watershed_in_block(
         affs,
         block,
         context,
@@ -188,12 +337,6 @@ def watershed_in_block(
     else:
         max_affinity_value = 1.0
 
-    if mask is not None:
-
-        logger.debug("reading mask from %s", block.read_roi)
-        mask_data = get_mask_data_in_roi(mask, affs.roi, affs.voxel_size)
-        logger.debug("masking affinities")
-        affs.data *= mask_data
 
     # extract fragments
     fragments_data, _ = watershed_from_affinities(

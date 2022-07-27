@@ -2,28 +2,49 @@ import numpy as np
 import logging
 import waterz
 from scipy.ndimage import label, \
-        maximum_filter, \
-		gaussian_filter, \
-        measurements, \
+        maximum_filter,
         distance_transform_edt
 from skimage.segmentation import watershed
+from skimage.filters import sobel, threshold_otsu
+from skimage.restoration import denoise_tv_chambolle
 
 logger = logging.getLogger(__name__)
 
 
-def watershed(lsds, sigma, return_seeds=False, return_distances=False):
+def watershed_from_lsds(lsds, return_seeds=False, return_distances=False):
     '''Extract initial fragments from local shape descriptors ``lsds`` using a
     watershed transform. This assumes that the first three entries of
     ``lsds`` for each voxel are vectors pointing towards the center.'''
 
-    boundary_distances = np.sum(lsds[0:3,:]**2, axis=0)
-    boundary_distances = gaussian_filter(boundary_distances, sigma)
-    boundary_distances = boundary_distances.max() - boundary_distances
+    fragments = np.zeros(lsds.shape[1:], dtype=np.uint64)
+    boundary_distances = np.zeros(fragments.shape)
+    depth = fragments.shape[0]
 
-    ret = watershed_from_boundary_distance(boundary_distances, return_seeds)
+    if return_seeds:
+        seeds = np.zeros(fragments.shape, dtype=np.uint64)
+
+    id_offset = 0
+
+    for z in range(depth):
+
+        sob =  sobel(denoise_tv_chambolle(lsds[0,z],weight=0.05)) + sobel(denoise_tv_chambolle(lsds[1,z],weight=0.05)) + sobel(denoise_tv_chambolle(lsds[2,z],weight=0.05))
+        thresh = threshold_otsu(sob)
+        boundary_mask = sob <= thresh
+        boundary_distances[z] = distance_transform_edt(boundary_mask)
+
+        ret = watershed_from_boundary_distance(boundary_distances[z], boundary_mask, return_seeds=return_seeds)
+
+        fragments[z] = ret[0]
+
+        if return_seeds:
+            seeds[z] = ret[2]
+
+        id_offset = ret[1]
+
+    ret = (fragments,id_offset)
 
     if return_distances:
-        ret = ret + (boundary_distances,)
+        ret += (boundary_distances,)
 
     return ret
 
