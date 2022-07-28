@@ -1,5 +1,5 @@
 from __future__ import division
-from .fragments import watershed_from_affinities
+from .fragments import watershed_from_affinities, watershed_from_lsds
 from funlib.segment.arrays import relabel, replace_values
 from scipy.ndimage import measurements
 import daisy
