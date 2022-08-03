@@ -5,7 +5,8 @@ from scipy.ndimage import label, \
         maximum_filter, \
         distance_transform_edt
 from skimage.segmentation import watershed
-from skimage.filters import sobel, canny, threshold_otsu
+from skimage.filters import sobel, threshold_otsu
+from skimage.feature import canny
 from skimage.restoration import denoise_tv_chambolle
 
 logger = logging.getLogger(__name__)
