@@ -5,13 +5,13 @@ from scipy.ndimage import label, \
         maximum_filter, \
         distance_transform_edt
 from skimage.segmentation import watershed
-from skimage.filters import sobel, threshold_otsu
+from skimage.filters import sobel, canny, threshold_otsu
 from skimage.restoration import denoise_tv_chambolle
 
 logger = logging.getLogger(__name__)
 
 
-def watershed_from_lsds(lsds, background_mask=False, return_seeds=False, return_distances=False):
+def watershed_from_lsds(lsds, background_mask=False, mode='canny', return_seeds=False, return_distances=False):
     '''Extract initial fragments from local shape descriptors ``lsds`` using a
     watershed transform. This assumes that the first three entries of
     ``lsds`` for each voxel are vectors pointing towards the center.'''
@@ -26,8 +26,13 @@ def watershed_from_lsds(lsds, background_mask=False, return_seeds=False, return_
     id_offset = 0
 
     for z in range(depth):
-
-        sob =  sobel(denoise_tv_chambolle(lsds[0,z],weight=0.05)) + sobel(denoise_tv_chambolle(lsds[1,z],weight=0.05)) + sobel(denoise_tv_chambolle(lsds[2,z],weight=0.05))
+        
+        if mode == "canny":
+             sob = canny(denoise_tv_chambolle(lsds[0],weight=0.05),sigma=2) + canny(denoise_tv_chambolle(lsds[1],weight=0.05),sigma=2) + canny(denoise_tv_chambolle(lsds[2],weight=0.05),sigma=2)
+        elif mode == "sobel":
+             sob =  sobel(denoise_tv_chambolle(lsds[0,z],weight=0.05)) + sobel(denoise_tv_chambolle(lsds[1,z],weight=0.05)) + sobel(denoise_tv_chambolle(lsds[2,z],weight=0.05))
+        else: raise AssertionError("unknown watershed mode. choose 'canny' or 'sobel'.")
+             
         thresh = threshold_otsu(sob)
         boundary_mask = sob <= thresh
         boundary_distances[z] = distance_transform_edt(boundary_mask)
