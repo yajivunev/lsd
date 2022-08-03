@@ -28,7 +28,7 @@ def watershed_from_lsds(lsds, background_mask=False, mode='canny', return_seeds=
     for z in range(depth):
         
         if mode == "canny":
-             sob = canny(denoise_tv_chambolle(lsds[0],weight=0.05),sigma=2) + canny(denoise_tv_chambolle(lsds[1],weight=0.05),sigma=2) + canny(denoise_tv_chambolle(lsds[2],weight=0.05),sigma=2)
+             sob = canny(denoise_tv_chambolle(lsds[0,z],weight=0.05),sigma=2) + canny(denoise_tv_chambolle(lsds[1,z],weight=0.05),sigma=2) + canny(denoise_tv_chambolle(lsds[2,z],weight=0.05),sigma=2)
         elif mode == "sobel":
              sob =  sobel(denoise_tv_chambolle(lsds[0,z],weight=0.05)) + sobel(denoise_tv_chambolle(lsds[1,z],weight=0.05)) + sobel(denoise_tv_chambolle(lsds[2,z],weight=0.05))
         else: raise AssertionError("unknown watershed mode. choose 'canny' or 'sobel'.")
