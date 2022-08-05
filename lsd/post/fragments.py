@@ -12,7 +12,12 @@ from skimage.restoration import denoise_tv_chambolle
 logger = logging.getLogger(__name__)
 
 
-def watershed_from_lsds(lsds, background_mask=False, mode='canny', return_seeds=False, return_distances=False):
+def watershed_from_lsds(
+        lsds, 
+        background_mask=False, 
+        mode='canny', 
+        return_seeds=False, 
+        return_distances=False):
     '''Extract initial fragments from local shape descriptors ``lsds`` using a
     watershed transform. This assumes that the first three entries of
     ``lsds`` for each voxel are vectors pointing towards the center.'''
@@ -60,6 +65,7 @@ def watershed_from_lsds(lsds, background_mask=False, mode='canny', return_seeds=
 def watershed_from_affinities(
         affs,
         max_affinity_value,
+        background_mask=False,
         fragments_in_xy=False,
         return_seeds=False,
         min_seed_distance=10):
