@@ -43,10 +43,13 @@ def watershed_from_lsds(
         boundary_mask = sob <= thresh
         boundary_distances[z] = distance_transform_edt(boundary_mask)
 
-        if background_mask == True:
-            ret = watershed_from_boundary_distance(boundary_distances[z], boundary_mask, return_seeds=return_seeds)
-        else:
-            ret = watershed_from_boundary_distance(boundary_distances[z], boundary_mask=None, return_seeds=return_seeds)
+        if background_mask == False:
+            boundary_mask = None
+         
+        ret = watershed_from_boundary_distance(
+                boundary_distances[z], 
+                boundary_mask, 
+                return_seeds=return_seeds)
         
         fragments[z] = ret[0]
 
@@ -97,22 +100,15 @@ def watershed_from_affinities(
             #if labels_mask is not None:
             #    boundary_mask *= labels_mask.astype(bool)
 
-            if background_mask == True:
-                ret = watershed_from_boundary_distance(
-                        boundary_distances,
-                        boundary_mask,
-                        return_seeds=return_seeds,
-                        id_offset=id_offset,
-                        min_seed_distance=min_seed_distance)
-
-            else:
-                ret = watershed_from_boundary_distance(
-                        boundary_distances,
-                        boundary_mask=None,
-                        return_seeds=return_seeds,
-                        id_offset=id_offset,
-                        min_seed_distance=min_seed_distance)
-                
+            if background_mask == False:
+                boundary_mask = None
+            
+            ret = watershed_from_boundary_distance(
+                boundary_distances,
+                boundary_mask,
+                return_seeds=return_seeds,
+                id_offset=id_offset,
+                min_seed_distance=min_seed_distance)
                 
             fragments[z] = ret[0]
             if return_seeds:
@@ -129,19 +125,14 @@ def watershed_from_affinities(
         boundary_mask = np.mean(affs, axis=0)>0.5*max_affinity_value
         boundary_distances = distance_transform_edt(boundary_mask)
  
-        if background_mask == True:
-            ret = watershed_from_boundary_distance(
-                boundary_distances,
-                boundary_mask,
-                return_seeds=return_seeds,
-                min_seed_distance=min_seed_distance)
-
-        else:
-            ret = watershed_from_boundary_distance(
-                boundary_distances,
-                boundary_mask=None,
-                return_seeds=return_seeds,
-                min_seed_distance=min_seed_distance)
+        if background_mask == False:
+            boundary_mask = None
+        
+        ret = watershed_from_boundary_distance(
+            boundary_distances,
+            boundary_mask,
+            return_seeds=return_seeds,
+            min_seed_distance=min_seed_distance)
 
         fragments = ret[0]
 
