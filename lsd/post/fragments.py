@@ -65,21 +65,23 @@ def watershed_from_lsds(
 
     return ret
 
+
 def watershed_from_affinities(
         affs,
-        max_affinity_value,
+        denoise=True,
         background_mask=False,
         fragments_in_xy=False,
         return_seeds=False,
         min_seed_distance=10):
     '''Extract initial fragments from affinities using a watershed
     transform. Returns the fragments and the maximal ID in it.
-
     Returns:
-
         (fragments, max_id)
         or
         (fragments, max_id, seeds) if return_seeds == True'''
+
+    if denoise:
+        affs = np.stack([denoise_tv_chambolle(x,weight=0.05) for x in affs])
 
     if fragments_in_xy:
 
@@ -93,12 +95,11 @@ def watershed_from_affinities(
         id_offset = 0
 
         for z in range(depth):
-
-            boundary_mask = mean_affs[z]>0.5*max_affinity_value
+            
+            thresh = threshold_otsu(mean_affs[z])
+            
+            boundary_mask = mean_affs[z] >= thresh
             boundary_distances = distance_transform_edt(boundary_mask)
-
-            #if labels_mask is not None:
-            #    boundary_mask *= labels_mask.astype(bool)
 
             if background_mask == False:
                 boundary_mask = None
@@ -122,7 +123,9 @@ def watershed_from_affinities(
 
     else:
 
-        boundary_mask = np.mean(affs, axis=0)>0.5*max_affinity_value
+        thresh = threshold_otsu(np.mean(affs,axis=0))
+        
+        boundary_mask = np.mean(affs[:3],axis=0) >= thresh
         boundary_distances = distance_transform_edt(boundary_mask)
  
         if background_mask == False:
@@ -150,7 +153,7 @@ def watershed_from_boundary_distance(
     maxima = max_filtered==boundary_distances
     seeds, n = label(maxima)
 
-    print(f"Found {n} fragments")
+    logger.info(f"Found {n} fragments")
 
     if n == 0:
         return np.zeros(boundary_distances.shape, dtype=np.uint64), id_offset
