@@ -97,7 +97,7 @@ def watershed_from_affinities(
             #if labels_mask is not None:
             #    boundary_mask *= labels_mask.astype(bool)
 
-            if background_mask = True:
+            if background_mask == True:
                 ret = watershed_from_boundary_distance(
                         boundary_distances,
                         boundary_mask,
@@ -129,7 +129,7 @@ def watershed_from_affinities(
         boundary_mask = np.mean(affs, axis=0)>0.5*max_affinity_value
         boundary_distances = distance_transform_edt(boundary_mask)
  
-        if background_mask = True:
+        if background_mask == True:
             ret = watershed_from_boundary_distance(
                 boundary_distances,
                 boundary_mask,
