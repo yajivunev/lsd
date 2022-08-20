@@ -203,7 +203,9 @@ def watershed_in_block(
 
     elif name == 'lsds':
 
-        fragments_data, _ = watershed_from_lsds(ds_in.data)
+        fragments_data, _ = watershed_from_lsds(
+                ds_in.data,
+                min_seed_distance=min_seed_distance)
 
     else: raise AssertionError("can only make fragments from lsds or affs")
 

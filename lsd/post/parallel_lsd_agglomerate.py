@@ -5,6 +5,7 @@ import daisy
 import logging
 import numpy as np
 import skimage.future
+from skimage.restoration import denoise_tv_chambolle
 
 logger = logging.getLogger(__name__)
 
@@ -88,6 +89,12 @@ def agglomerate_in_block(
         fragments,
         rag_provider,
         lsd_extractor,
+        denoise_wt,
+        components,
+        blur,
+        cube_edge_score,
+        node_diff,
+        node_reduce,
         block):
 
     logger.info(
@@ -100,6 +107,10 @@ def agglomerate_in_block(
     rag = rag_provider[lsds.roi]
     voxel_size = lsds.voxel_size
     lsds = lsds.to_ndarray()
+
+    # denoise lsds
+    if denoise_wt is not None:
+        lsds = np.stack([denoise_tv_chambolle(x,weight=denoise_wt) for x in lsds])
 
     # So far, 'rag' does not contain any edges belonging to write_roi (there
     # might be a few edges from neighboring blocks, though). Use the fragments
@@ -119,8 +130,14 @@ def agglomerate_in_block(
         lsd_extractor,
         voxel_size=voxel_size,
         rag=merge_rag,
-        log_prefix='%s: '%block.write_roi)
-    merge_history = agglomeration.merge_until(0)
+        components=components,
+        blur=blur,
+        cube_edge_score=cube_edge_score,
+        node_diff=node_diff,
+        node_reduce=node_reduce,
+        log_prefix='%s '%block.write_roi)
+)
+    merge_history = agglomeration.merge_until(merge_threshold)
 
     # create a merge tree from the merge history
     merge_tree = MergeTree(np.unique(fragments))

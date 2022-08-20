@@ -15,7 +15,8 @@ def watershed_from_lsds(
         lsds,
         denoise_wt=0.05,
         background_mask=False, 
-        mode='prewitt', 
+        mode='prewitt',
+        min_seed_distance=10,
         return_seeds=False, 
         return_distances=False):
     '''Extract initial fragments from local shape descriptors ``lsds`` using a
@@ -55,7 +56,7 @@ def watershed_from_lsds(
                 boundary_distances[z], 
                 boundary_mask, 
                 return_seeds=return_seeds,
-                min_seed_distance=10)
+                min_seed_distance=min_seed_distance)
         
         fragments[z] = ret[0]
 
