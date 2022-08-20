@@ -43,6 +43,13 @@ class AddLocalShapeDescriptor(BatchFilter):
             to compute a weighed average of statistics inside an object.
             ``sphere`` accumulates values in a sphere.
 
+        gaussian_mode (string, optional): Either ``nearest`` or ``constant``, for when
+            mode == ``gaussian``.
+
+        components (string, optional): The components of the 10-dimensional lsds to return.
+            A string of integers from 0 through 9 in order, representing the 
+            components of the 10 to compute and return.
+
         downsample (int, optional): Downsample the segmentation mask to extract
             the statistics with the given factore. Default is 1 (no
             downsampling).
@@ -57,6 +64,8 @@ class AddLocalShapeDescriptor(BatchFilter):
         unlabelled=None,
         sigma=5.0,
         mode="gaussian",
+        gaussian_mode="nearest",
+        components=None,
         downsample=1,
     ):
 
@@ -65,6 +74,7 @@ class AddLocalShapeDescriptor(BatchFilter):
         self.lsds_mask = lsds_mask
         self.labels_mask = labels_mask
         self.unlabelled = unlabelled
+        self.components = components
 
         try:
             self.sigma = tuple(sigma)
@@ -72,12 +82,17 @@ class AddLocalShapeDescriptor(BatchFilter):
             self.sigma = (sigma,) * 3
 
         self.mode = mode
+        self.gaussian_mode = gaussian_mode
         self.downsample = downsample
         self.voxel_size = None
         self.context = None
         self.skip = False
 
-        self.extractor = LsdExtractor(self.sigma, self.mode, self.downsample)
+        self.extractor = LsdExtractor(
+                sigma = self.sigma, 
+                mode = self.mode, 
+                downsample = self.downsample,
+                gaussian_mode = self.gaussian_mode)
 
     def setup(self):
 
@@ -151,6 +166,7 @@ class AddLocalShapeDescriptor(BatchFilter):
             segmentation=segmentation_array.data,
             voxel_size=self.voxel_size,
             roi=voxel_roi_in_seg,
+            components=self.components
         )
 
         # create descriptor array
