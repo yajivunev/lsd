@@ -15,32 +15,24 @@ import math
 
 logger = logging.getLogger(__name__)
 
+
 class LsdAgglomeration(object):
     '''Create a local shape descriptor agglomerator.
-
     Args:
-
         fragments (``np.ndarray``):
-
             Initial fragments.
-
         target_lsds (``np.ndarray``):
-
             The local shape descriptors to match.
-
         lsd_extractor (``LsdExtractor``):
-
             The local shape descriptor object used to compute the difference
             between the segmentation and the target LSDs.
-
         voxel_size (``tuple`` of ``int``, optional):
-
             The voxel size of ``fragments``. Defaults to 1.
-
         rag (`class:Rag`, optional):
-
             A custom region adjacency graph (RAG) to agglomerate on. If not
             given, a RAG will be extracted from ``fragments``.
+        components (``string`` of ``int``, optional):
+            The components to use for agglomeration.
     '''
 
     def __init__(
@@ -50,6 +42,12 @@ class LsdAgglomeration(object):
             lsd_extractor,
             voxel_size=None,
             rag=None,
+            components=None,
+            gaussian_mode="nearest",
+            blur=None,
+            cube_edge_score=False,
+            node_diff="square",
+            node_reduce="root_sum",
             log_prefix=''):
 
         self.segmentation = np.array(fragments)
@@ -60,7 +58,13 @@ class LsdAgglomeration(object):
         self.rag = rag
         self.context = lsd_extractor.get_context()
         self.log_prefix = log_prefix
-
+        self.components = components
+        self.gaussian_mode = gaussian_mode
+        self.blur = blur
+        self.cube_edge_score = cube_edge_score
+        self.node_diff = node_diff
+        self.node_reduce = node_reduce
+        
         if voxel_size is None:
             self.voxel_size = (1,)*len(fragments.shape)
         else:
@@ -72,7 +76,6 @@ class LsdAgglomeration(object):
         '''Merge until the given threshold. Since edges are scored by how much
         they decrease the distance to ``target_lsds``, a threshold of 0 should
         be optimal.
-
         Returns the merge history.'''
 
         self.__log_info("Merging until %f...", threshold)
@@ -163,15 +166,40 @@ class LsdAgglomeration(object):
 
         weight = self.__compute_edge_score(u, v)
         self.__log_debug("Scoring merge between %d and %d with %f", u, v, weight)
-
+        
         return {'weight': weight}
+    
+    def __node_score(self, diff, u_mask):
+        '''Transform and reduce diff = target_lsds - frags_lsds.'''
+               
+        #transform to [0,1] from [-1,1]
+        if self.node_diff == "abs":
+            diff = np.absolute(diff)
+        elif self.node_diff == "square":
+            diff = diff**2
+        elif self.node_diff == "root":
+            diff = np.sqrt(np.absolute(diff)) #to avoid imaginary vals
+        else:
+            raise AssertionError("unknown node score diff mode.")
+            
+        #reduce
+        if "sum" in self.node_reduce:
+            score = np.sum(diff)
+        elif "mean" in self.node_reduce:
+            score = np.mean(diff[:,u_mask]) #masked select all channels
+        else: raise AssertionError("unknown reduce method")
+        
+        #root?
+        if "root" in self.node_reduce:
+            score = np.sqrt(score)
+        
+        #return
+        return score
 
     def __compute_node_score(self, u):
         '''Compute the LSDs score for a node.
-
         The node score is the sum of squared differences between the node LSDs
         and the target LSDs.
-
         This also stores the node's LSDs in self.lsds.
         '''
 
@@ -189,7 +217,9 @@ class LsdAgglomeration(object):
         lsds = self.lsd_extractor.get_descriptors(
             segmentation,
             labels=[u],
-            voxel_size=self.voxel_size)
+            voxel_size=self.voxel_size,
+            components=self.components,
+            blur=self.blur)
 
         # subtract from target LSDs
         u_mask = segmentation == u
@@ -199,15 +229,16 @@ class LsdAgglomeration(object):
 
         # update LSDs for u
         self.lsds[lsds_slice][:,u_mask] = lsds[:,u_mask]
+        
+        score = self.__node_score(diff,u_mask)
 
-        return np.sum(diff**2)
-
+        return score
+    
+    
     def __merge_nodes(self, u, v):
         '''Merge node u into v.
-
         This does not change the graph (this is taken care of by the
         hierarchical agglomeration).
-
         This updates the segmentation (u is replaced by v), the LSDs of the
         current segmentaion, the ROI of v, and computes the new score for v.
         '''
@@ -231,7 +262,9 @@ class LsdAgglomeration(object):
             segmentation,
             roi=change_in_context_roi,
             labels=[v],
-            voxel_size=self.voxel_size)
+            voxel_size=self.voxel_size,
+            components=self.components,
+            blur=self.blur)
 
         # update LSDs (only where segmentation == v)
         v_mask = segmentation[change_in_context_roi.to_slices()] == v
@@ -267,12 +300,9 @@ class LsdAgglomeration(object):
 
     def __compute_edge_score(self, u, v):
         '''Compute the LSDs score for an edge.
-
         The edge score is by how much the incident node scores would improve
         when merged (negative if the score decreases). More formally, it is:
-
             s(u + v) - (s(u) + s(v))
-
         where s(.) is the score of a node and (u + v) is a node obtained from
         merging u and v.
         '''
@@ -305,8 +335,9 @@ class LsdAgglomeration(object):
         lsds_separate = self.lsds[lsds_slice]
         diff = self.target_lsds[lsds_slice] - lsds_separate
         diff[:,not_uv_mask] = 0
-        score_separate = np.sum(diff**2)
-
+            
+        score_separate = self.__node_score(diff,~not_uv_mask)
+        
         # mark u as v in segmentation
         segmentation[segmentation==u] = v
 
@@ -315,26 +346,31 @@ class LsdAgglomeration(object):
             segmentation,
             roi=change_in_context_roi,
             labels=[v],
-            voxel_size=self.voxel_size)
+            voxel_size=self.voxel_size,
+            components=self.components,
+            blur=self.blur)
         diff = self.target_lsds[lsds_slice] - lsds_merged
         diff[:,not_uv_mask] = 0
-        score_merged = np.sum(diff**2)
-
+        
+        score_merged = self.__node_score(diff,~not_uv_mask)
+        
         assert lsds_separate.shape == lsds_merged.shape
-
+        
+        #tweaks
+        edge_score = score_merged - score_separate
+        edge_score = edge_score**3 if self.cube_edge_score else edge_score
+        
         self.__log_debug(
             "Edge score for (%d, %d) is %f - %f = %f",
             u, v, score_merged, score_separate,
-            score_merged - score_separate)
+            edge_score)
 
-        return score_merged - score_separate
+        return edge_score
 
     def __get_lsds_edge_rois(self, u, v):
         '''Get two ROIs (change_roi, context_roi).
-
         change_roi bounds the regions in which LSDs are affected by a merge of
         u and v.
-
         context_roi is a superset of change_roi and bounds the region that
         needs to be considered to compute LSDs in change_roi.
         '''
@@ -348,7 +384,7 @@ class LsdAgglomeration(object):
             return (None, None)
 
         # the ROI of the complete volume
-        total_roi = gp.Roi(
+        total_roi = daisy.Roi(
             (0,)*len(self.segmentation.shape),
             self.segmentation.shape)
 
@@ -397,7 +433,7 @@ class LsdAgglomeration(object):
         offset = tuple(s.start for s in slices)
         shape = tuple(s.stop - s.start for s in slices)
 
-        roi = gp.Roi(offset, shape)
+        roi = daisy.Roi(offset, shape)
         roi = roi.snap_to_grid((self.lsd_extractor.downsample,)*roi.dims)
 
         return roi
