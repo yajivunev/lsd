@@ -1,7 +1,7 @@
-import gunpowder as gp
 import numpy as np
 import time
 import logging
+from funlib.geometry import Roi, Coordinate
 from scipy.ndimage import gaussian_filter
 from scipy.ndimage.filters import convolve
 from numpy.lib.stride_tricks import as_strided
@@ -132,12 +132,12 @@ class LsdExtractor(object):
         dims = len(segmentation.shape)
 
         if voxel_size is None:
-            voxel_size = daisy.Coordinate((1,)*dims)
+            voxel_size = Coordinate((1,)*dims)
         else:
-            voxel_size = daisy.Coordinate(voxel_size)
+            voxel_size = Coordinate(voxel_size)
 
         if roi is None:
-            roi = daisy.Roi((0,)*dims, segmentation.shape)
+            roi = Roi((0,)*dims, segmentation.shape)
 
         roi_slices = roi.to_slices()
 
