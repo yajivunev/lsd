@@ -1,5 +1,5 @@
 from __future__ import absolute_import
-from lsd.train import LsdExtractor
+from lsd import LsdExtractor
 from gunpowder import BatchFilter, Array, BatchRequest, Batch
 import logging
 import numpy as np
