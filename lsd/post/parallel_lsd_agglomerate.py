@@ -136,7 +136,7 @@ def agglomerate_in_block(
         node_diff=node_diff,
         node_reduce=node_reduce,
         log_prefix='%s '%block.write_roi)
-)
+
     merge_history = agglomeration.merge_until(merge_threshold)
 
     # create a merge tree from the merge history
