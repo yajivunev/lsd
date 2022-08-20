@@ -8,7 +8,7 @@ matplotlib.use('Agg')
 from scipy.ndimage.measurements import find_objects
 from skimage.future.graph import RAG
 from .graph_merge import merge_hierarchical
-import gunpowder as gp
+from funlib.geometry import Roi
 import numpy as np
 import logging
 import math
@@ -433,7 +433,7 @@ class LsdAgglomeration(object):
         offset = tuple(s.start for s in slices)
         shape = tuple(s.stop - s.start for s in slices)
 
-        roi = daisy.Roi(offset, shape)
+        roi = Roi(offset, shape)
         roi = roi.snap_to_grid((self.lsd_extractor.downsample,)*roi.dims)
 
         return roi
