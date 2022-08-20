@@ -384,7 +384,7 @@ class LsdAgglomeration(object):
             return (None, None)
 
         # the ROI of the complete volume
-        total_roi = daisy.Roi(
+        total_roi = Roi(
             (0,)*len(self.segmentation.shape),
             self.segmentation.shape)
 
