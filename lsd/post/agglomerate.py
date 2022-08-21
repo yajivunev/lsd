@@ -72,7 +72,7 @@ class LsdAgglomeration(object):
 
         self.__initialize_rag()
 
-    def merge_until(self, threshold, max_merges=-1):
+    def merge_until(self, threshold, return_segmentation=False,max_merges=-1):
         '''Merge until the given threshold. Since edges are scored by how much
         they decrease the distance to ``target_lsds``, a threshold of 0 should
         be optimal.
@@ -91,7 +91,7 @@ class LsdAgglomeration(object):
             merge_func=merge_func,
             weight_func=weight_func,
             max_merges=max_merges,
-            return_segmenation=False)
+            return_segmenation=return_segmentation)
 
         self.__log_info("Finished merging")
 
