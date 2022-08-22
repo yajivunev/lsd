@@ -75,7 +75,7 @@ def get_local_shape_descriptors(
 
 class LsdExtractor(object):
 
-    def __init__(self, sigma, mode='gaussian', gaussian_mode='nearest', downsample=1):
+    def __init__(self, sigma, mode='gaussian', gaussian_mode='constant', downsample=1):
         '''
         Create an extractor for local shape descriptors. The extractor caches
         the data repeatedly needed for segmentations of the same size. If this
@@ -319,18 +319,20 @@ class LsdExtractor(object):
                         descriptors[[i]] *= (segmentation[roi_slices] != 0)
 
         # blur before clip
-        if blur is not None:
-            descriptors = np.stack([gaussian_filter(x,sigma=blur,mode=self.gaussian_mode) for x in descriptors])
+
             
         # clip outliers
         np.clip(descriptors, 0.0, 1.0, out=descriptors)
         
         #strectch to [0,1]
-        max_v = np.max(descriptors)
-        min_v = np.min(descriptors)
+#         max_v = np.max(descriptors)
+#         min_v = np.min(descriptors)
         
-        descriptors = (descriptors - min_v)/(max_v - min_v) if max_v - min_v != 0.0 else descriptors
-
+#         descriptors = (descriptors - min_v)/(max_v - min_v) if max_v - min_v != 0.0 else descriptors
+        
+        if blur is not None:
+            descriptors = np.stack([gaussian_filter(x,sigma=blur,mode=self.gaussian_mode) for x in descriptors])
+            
         return descriptors
     
     def __get_stats(self, coords, mask, sigma_voxel, roi, components):
@@ -491,13 +493,15 @@ class LsdExtractor(object):
                     sigma=sigma,
                     mode='nearest',
                     truncate=3.0)[roi_slices]
-            else: 
+            elif self.gaussian_mode == "constant": 
                 return gaussian_filter(
                     array,
                     sigma=sigma,
                     mode='constant',
                     cval=0.0,
                     truncate=3.0)[roi_slices]
+            else:
+                raise AssertionError("unknown gaussian mode")
 
         elif mode == 'sphere':
 
