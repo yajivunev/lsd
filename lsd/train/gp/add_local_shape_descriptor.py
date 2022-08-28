@@ -64,7 +64,7 @@ class AddLocalShapeDescriptor(BatchFilter):
         unlabelled=None,
         sigma=5.0,
         mode="gaussian",
-        gaussian_mode="nearest",
+        gaussian_mode="constant",
         components=None,
         downsample=1,
     ):
