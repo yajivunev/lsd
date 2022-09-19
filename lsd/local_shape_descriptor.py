@@ -299,7 +299,7 @@ class LsdExtractor(object):
             if components is None:
                 
                 #mean_offsets in [0,1]
-                descriptors[[0, 1]] = descriptors[[0, 1]]/max_distance[:, None, None, None]*0.5 + 0.5
+                descriptors[[0, 1]] = descriptors[[0, 1]]/max_distance[:, None, None]*0.5 + 0.5
                 # pearsons in [0, 1]
                 descriptors[[4]] = descriptors[[4]]*0.5 + 0.5
                 # reset background to 0
@@ -311,7 +311,7 @@ class LsdExtractor(object):
                     x = int(x)
                     
                     if x in range(0,2):
-                        descriptors[[i]] = descriptors[[i]]/max_distance[x, None, None, None]*0.5 + 0.5
+                        descriptors[[i]] = descriptors[[i]]/max_distance[x, None, None]*0.5 + 0.5
                         descriptors[[i]] *= (segmentation[roi_slices] != 0)
                     
                     if x == 4:
