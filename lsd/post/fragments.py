@@ -13,7 +13,7 @@ logger = logging.getLogger(__name__)
 
 def watershed_from_lsds(
         lsds,
-        denoise_wt=0.05,
+        denoising=None,
         background_mask=False, 
         mode='prewitt',
         min_seed_distance=10,
@@ -22,14 +22,37 @@ def watershed_from_lsds(
     '''Extract initial fragments from local shape descriptors ``lsds`` using a
     watershed transform. This assumes that the first three entries of
     ``lsds`` for each voxel are vectors pointing towards the center.'''
-    
+
     fragments = np.zeros(lsds.shape[1:], dtype=np.uint64)
     boundary_distances = np.zeros(fragments.shape)
     depth = fragments.shape[0]
-        
-    if denoise_wt is not None:
-        lsds = np.stack([denoise_tv_chambolle(x,weight=denoise_wt) for x in lsds])
 
+    if denoising is not None:
+        
+        if denoising[0] == "tv":
+            
+            lsds = np.stack([denoise_tv_chambolle(
+                lsds[:,z],
+                weight=denoising[1],
+                channel_axis=0) for z in range(depth)], axis=1)
+            lsds = lsds.astype(np.float32)
+
+        elif denoising[0] == "bilateral":
+            
+            lsds = np.stack([denoise_bilateral(
+                lsds[:,z],
+                sigma_color=denoising[1],
+                sigma_spatial=denoising[2],
+                channel_axis=0) for z in range(depth)], axis=1)
+            lsds = lsds.astype(np.float32)
+
+        else:
+            
+            raise KeyError("unknown denoising mode for preds")
+        
+    else: 
+        lsds = (lsds/255.0).astype(np.float32) if lsds.dtype == np.uint8 else lsds
+        
     if return_seeds:
         seeds = np.zeros(fragments.shape, dtype=np.uint64)
 
@@ -37,14 +60,19 @@ def watershed_from_lsds(
 
     for z in range(depth):
         
+        if depth == 1:
+            dims = slice(0,2)
+        else: 
+            dims = slice(1,3)
+            
         if mode == "sobel":
-            sob =  np.sum([sobel(x) for x in lsds[1:3,z]],axis=0)
+            sob =  np.sum([sobel(x) for x in lsds[dims,z]],axis=0)
         elif mode == "prewitt":
-            sob =  np.sum([prewitt(x) for x in lsds[1:3,z]],axis=0)
+            sob =  np.sum([prewitt(x) for x in lsds[dims,z]],axis=0)
         elif mode == "roberts":
-            sob =  np.sum([roberts(x) for x in lsds[1:3,z]],axis=0)
+            sob =  np.sum([roberts(x) for x in lsds[dims,z]],axis=0)
         else: raise AssertionError("unknown watershed mode. choose 'sobel' or 'roberts' or 'prewitt'.")
-        
+
         thresh = threshold_otsu(sob)
         boundary_mask = sob <= thresh
         boundary_distances[z] = distance_transform_edt(boundary_mask)
@@ -75,7 +103,7 @@ def watershed_from_lsds(
 
 def watershed_from_affinities(
         affs,
-        denoise_wt=None,
+        denoising=None,
         background_mask=False,
         fragments_in_xy=False,
         return_seeds=False,
@@ -87,8 +115,33 @@ def watershed_from_affinities(
         or
         (fragments, max_id, seeds) if return_seeds == True'''
 
-    if denoise_wt is not None:
-        affs = np.stack([denoise_tv_chambolle(x,weight=denoise_wt) for x in affs])
+    depth = affs[0].shape[0]
+    
+    if denoising is not None:
+        
+        if denoising[0] == "tv":
+            
+            affs = np.stack([denoise_tv_chambolle(
+                affs[:,z],
+                weight=denoising[1],
+                channel_axis=0) for z in range(depth)], axis=1)
+            affs = affs.astype(np.float32)
+
+        elif denoising[0] == "bilateral":
+            
+            affs = np.stack([denoise_bilateral(
+                affs[:,z],
+                sigma_color=denoising[1],
+                sigma_spatial=denoising[2],
+                channel_axis=0) for z in range(depth)], axis=1)
+            affs = affs.astype(np.float32)
+
+        else:
+            
+            raise KeyError("unknown denoising mode for preds")
+        
+    else: 
+        affs = (affs/255.0).astype(np.float32) if affs.dtype == np.uint8 else affs
 
     if fragments_in_xy:
 
