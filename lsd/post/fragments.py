@@ -101,7 +101,7 @@ def watershed_from_lsds(
     return ret
 
 
-def watershed_from_affs(
+def watershed_from_affinities(
         affs,
         denoising=None,
         background_mask=False,
