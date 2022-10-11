@@ -6,7 +6,7 @@ from scipy.ndimage import label, \
         distance_transform_edt
 from skimage.segmentation import watershed
 from skimage.filters import sobel, roberts, prewitt, threshold_otsu
-from skimage.restoration import denoise_tv_chambolle
+from skimage.restoration import denoise_tv_chambolle, denoise_bilateral
 
 logger = logging.getLogger(__name__)
 
@@ -101,7 +101,7 @@ def watershed_from_lsds(
     return ret
 
 
-def watershed_from_affinities(
+def watershed_from_affs(
         affs,
         denoising=None,
         background_mask=False,
