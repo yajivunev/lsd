@@ -43,12 +43,23 @@ class AddLocalShapeDescriptor(BatchFilter):
             to compute a weighed average of statistics inside an object.
             ``sphere`` accumulates values in a sphere.
 
-        gaussian_mode (string, optional): Either ``nearest`` or ``constant``, for when
-            mode == ``gaussian``.
+        components (string, optional): The components of the local shape descriptors to
+            compute and return. Should be a string of integers chosen from 0 through 9 (if 3D)
+            or 6 (if 2D), in order. Example: "0129" or "345". Defaults to all components.
+            
+            Component string lookup, where example component : "3D axes", "2D axes"
 
-        components (string, optional): The components of the 10-dimensional lsds to return.
-            A string of integers from 0 through 9 in order, representing the 
-            components of the 10 to compute and return.
+                mean offset (mean) : "012", "01" 
+                orthogonal covariance (ortho) : "345", "23"
+                diagonal covariance (diag) : "678", "4"
+                size : "9", "5"
+
+            Example combinations:
+
+                diag + size : "6789", "45"
+                mean + diag + size : "0126789", "0145"
+                mean + ortho + diag : "012345678", "01234"
+                ortho + diag : "345678", "234"
 
         downsample (int, optional): Downsample the segmentation mask to extract
             the statistics with the given factore. Default is 1 (no
@@ -64,7 +75,6 @@ class AddLocalShapeDescriptor(BatchFilter):
         unlabelled=None,
         sigma=5.0,
         mode="gaussian",
-        gaussian_mode="constant",
         components=None,
         downsample=1,
     ):
@@ -82,17 +92,12 @@ class AddLocalShapeDescriptor(BatchFilter):
             self.sigma = (sigma,) * 3
 
         self.mode = mode
-        self.gaussian_mode = gaussian_mode
         self.downsample = downsample
         self.voxel_size = None
         self.context = None
         self.skip = False
 
-        self.extractor = LsdExtractor(
-                sigma = self.sigma, 
-                mode = self.mode, 
-                downsample = self.downsample,
-                gaussian_mode = self.gaussian_mode)
+        self.extractor = LsdExtractor(self.sigma, self.mode, self.downsample)
 
     def setup(self):
 
@@ -164,9 +169,9 @@ class AddLocalShapeDescriptor(BatchFilter):
 
         descriptor = self.extractor.get_descriptors(
             segmentation=segmentation_array.data,
+            components=self.components,
             voxel_size=self.voxel_size,
             roi=voxel_roi_in_seg,
-            components=self.components
         )
 
         # create descriptor array
