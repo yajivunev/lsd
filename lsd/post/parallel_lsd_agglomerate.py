@@ -4,7 +4,7 @@ from .merge_tree import MergeTree
 import daisy
 import logging
 import numpy as np
-import skimage.future
+import skimage
 
 logger = logging.getLogger(__name__)
 
@@ -104,7 +104,7 @@ def agglomerate_in_block(
     # So far, 'rag' does not contain any edges belonging to write_roi (there
     # might be a few edges from neighboring blocks, though). Use the fragments
     # to get an initial RAG (merge_rag) which we also use for agglomeration.
-    merge_rag = skimage.future.graph.RAG(fragments)
+    merge_rag = skimage.graph.RAG(fragments)
 
     # Keep the original RAG edges
     for (u, v) in merge_rag.edges():

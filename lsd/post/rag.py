@@ -4,9 +4,9 @@ from networkx import Graph, connected_components
 from scipy.ndimage.measurements import center_of_mass
 import copy
 import numpy as np
-import skimage.future
+import skimage
 
-class Rag(skimage.future.graph.RAG):
+class Rag(skimage.graph.RAG):
     '''A region adjacency graph (RAG) with the following attributes:
 
     Edge attributes:
