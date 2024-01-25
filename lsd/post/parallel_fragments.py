@@ -2,6 +2,8 @@ from __future__ import division
 from .fragments import watershed_from_affinities
 from funlib.segment.arrays import relabel, replace_values
 from scipy.ndimage import measurements
+from funlib.persistence import Array
+from funlib.geometry import Coordinate, Roi
 import daisy
 import logging
 import numpy as np
@@ -31,7 +33,7 @@ def get_mask_data_in_roi(mask, roi, target_voxel_size):
 
     upsampled_aligned_data = upsample(aligned_data, factor)
 
-    upsampled_aligned_mask = daisy.Array(
+    upsampled_aligned_mask = Array(
         upsampled_aligned_data,
         roi=aligned_roi,
         voxel_size=target_voxel_size)
@@ -54,7 +56,7 @@ def parallel_watershed(
 
     Args:
 
-        affs (`class:daisy.Array`):
+        affs (`class:Array`):
 
             An array containing affinities.
 
@@ -72,7 +74,7 @@ def parallel_watershed(
 
             The context to consider for fragment extraction, in world units.
 
-        fragments_out (`class:daisy.Array`):
+        fragments_out (`class:Array`):
 
             An array to store fragments in. Should be of ``dtype`` ``uint64``.
 
@@ -80,7 +82,7 @@ def parallel_watershed(
 
             The number of parallel workers.
 
-        mask (`class:daisy.Array`):
+        mask (`class:Array`):
 
             A dataset containing a mask. If given, fragments are only extracted
             for masked-in (==1) areas.
@@ -117,8 +119,8 @@ def parallel_watershed(
         context = daisy.Coordinate(context)
 
     total_roi = affs.roi.grow(context, context)
-    read_roi = daisy.Roi((0,)*affs.roi.dims(), block_size).grow(context, context)
-    write_roi = daisy.Roi((0,)*affs.roi.dims(), block_size)
+    read_roi = Roi((0,)*affs.roi.dims(), block_size).grow(context, context)
+    write_roi = Roi((0,)*affs.roi.dims(), block_size)
 
     num_voxels_in_block = (write_roi/affs.voxel_size).size()
 
@@ -283,7 +285,7 @@ def watershed_in_block(
 
     #todo add key value replacement option
 
-    fragments = daisy.Array(fragments_data, affs.roi, affs.voxel_size)
+    fragments = Array(fragments_data, affs.roi, affs.voxel_size)
 
     # crop fragments to write_roi
     fragments = fragments[block.write_roi]
@@ -301,7 +303,7 @@ def watershed_in_block(
         assert max_id < num_voxels_in_block
 
     # ensure unique IDs
-    id_bump = block.block_id*num_voxels_in_block
+    id_bump = block.block_id[1]*num_voxels_in_block
     logger.debug("bumping fragment IDs by %i", id_bump)
     fragments.data[fragments.data>0] += id_bump
     fragment_ids = range(id_bump + 1, id_bump + 1 + int(max_id))
@@ -316,7 +318,7 @@ def watershed_in_block(
 
     # get fragment centers
     fragment_centers = {
-        fragment: block.write_roi.get_offset() + affs.voxel_size*center
+        fragment: block.write_roi.get_offset() + affs.voxel_size*Coordinate(center)
         for fragment, center in zip(
             fragment_ids,
             measurements.center_of_mass(fragments.data, fragments.data, fragment_ids))
@@ -334,4 +336,4 @@ def watershed_in_block(
         )
         for node, c in fragment_centers.items()
     ])
-    rag.write_nodes(block.write_roi)
+    rag_provider.write_graph(rag,block.write_roi)
